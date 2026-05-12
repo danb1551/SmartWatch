@@ -3,6 +3,9 @@
 #include "pictures.h"
 #include "config.h"
 
+bool uspavat = true;
+bool showHidden = false;
+bool clearShowHidden = true;
 bool debug = true;
 bool clear = true;
 bool showCopyright = true;
@@ -10,8 +13,9 @@ bool sleeping = false;
 // 1 = hodiny; 2 = wifi; 3 = bluetooth; 4 = IR
 int renderIndex = 0;
 int renderedIndex;
+int choosen = 0;
 int prevMinute = 99;
-String dnyTydnu[] = {"NE", "PO", "ÚT", "ST", "ČT", "PÁ", "SO"};
+String dnyTydnu[] = {"NE", "PO", "UT", "ST", "CT", "PA", "SO"};
 int brightness = 1;
 
 int lastActionTime = 0;
@@ -23,6 +27,7 @@ int lastBtnBState = 0;
 // power button
 int lastBtnPwrState = 0;
 
+void pass() {}
 
 void setup() {
     auto cfg = M5.config();
@@ -43,42 +48,38 @@ void setup() {
     WiFi.mode(WIFI_OFF);
     btStop();
     setCpuFrequencyMhz(debug ? 20 : 240);
+    M5.Display.powerSave(true);
 }
 
 void loop() {
     M5.update();
-    // ještě vymyslet, jestli funkci nebo porovnání
-    //bude si to muset pamatovat poslední stav a podle něj porovnat
-    //if (M5.BtnA.getState() == M5.BtnA.state_clicked) {M5.BtnA.isPressed();}
-    //enum button_state_t : std::uint8_t
-    //{ state_nochange
-    //, state_clicked
-    //, state_hold
-    //, state_decide_click_count
-    //};
+
+    /* ještě vymyslet, jestli funkci nebo porovnání
+    bude si to muset pamatovat poslední stav a podle něj porovnat
+    if (M5.BtnA.getState() == M5.BtnA.state_clicked) {M5.BtnA.isPressed();}
+    enum button_state_t : std::uint8_t
+    { state_nochange
+    , state_clicked
+    , state_hold
+    , state_decide_click_count
+    }; */
 
     if (M5.BtnA.isPressed() && millis() - lastActionTime > 150) {
-        wakeup();
         select();
         lastActionTime = millis();
     } else if (M5.BtnB.isPressed() && millis() - lastActionTime > 150) {
-        wakeup();
         prev();
         lastActionTime = millis();
     } else if (M5.BtnPWR.isPressed() && millis() - lastActionTime > 150) {
-        wakeup();
-        next();
+        sleeping ? wakeup() : next();
         lastActionTime = millis();
     }
-    if (millis() - lastActionTime > 6000) {
-        sleep();
+    if ((millis() - lastActionTime > 6000) && uspavat) {
         sleep();
     }
 
-    M5.Display.powerSave(true);
-
     render();
-    delay(10);
+    delay(20);
 }
 
 void sleep() {
@@ -89,33 +90,81 @@ void sleep() {
 }
 
 void wakeup() {
+    sleeping = false;
     M5.Display.wakeup();
     render();
     M5.Display.setBrightness(brightness);
-    sleeping = false;
+    delay(500);
+    //... better change it in loop so that it will not call next() function
+    //sleeping = false;
 }
 
 void select() {
+    if (showHidden) {
+        if (M5.Display.getBrightness() == brightness) {
+            M5.Display.setBrightness(255);
+        } else {
+            M5.Display.setBrightness(brightness);
+        }
+    }
     if (renderedIndex == 1 || renderedIndex == 0) {
+        if (showHidden == true) {
+            renderHidden();
+            return;
+        }
         sleep();
-    }
-    //M5.Display.fillRect(0, 0, 100, 100, 0x6767);
-    return;
-    if (renderedIndex == 2) {
-        return;
-    }
+    }/* else if (renderedIndex == 2) {
+        choosen = 2;
+        clear = true;
+    } else if (renderedIndex == 3) {
+        choosen = 3;
+        clear = true;
+    }*/
 }
 
 void next() {
+    if (showHidden) {
+        renderIndex = 0;
+        showHidden = false;
+        clearShowHidden = true;
+    }
+    clear = true;
     renderIndex++;
-    if (renderIndex == 4) {}
+    if (renderIndex == 5) {
+        renderIndex = 4;
+        clear = false;
+    }
+    /*if (choosen > 1) {
+        if (choosen == 2) {
+            renderIndex = 20;
+        } else if (choosen == 3) {
+            renderIndex = 30;
+        }
+    }*/
 }
 
 void prev() {
-    drawBattery();
+    clear = true;
+    renderIndex--;
+    if (renderIndex == 0) {
+        showHidden = true;
+        renderIndex = 1;
+        clear = false;
+    }
+}
+
+void renderHidden() {
+    if (clearShowHidden) {
+        clearShowHidden = false;
+        M5.Display.fillScreen(0x0);
+        M5.Display.pushImage(0, 0, 240, 135, image_fotka_hidden);
+    }
 }
 
 void renderMain() {
+    if (showHidden) {
+        return;
+    }
     auto time = M5.Rtc.getTime();
     auto date = M5.Rtc.getDate();
     M5.Display.startWrite();
@@ -124,20 +173,20 @@ void renderMain() {
     if (clear) {
         M5.Display.fillScreen(TFT_BLACK);
         // line
-        M5.Display.drawLine(64, 67, 174, 67, TFT_GREEN);
+        M5.Display.drawLine(64, 80, 174, 80, TFT_GREEN);
         // rect
-        M5.Display.drawRect(63, 66, 113, 3, 0x0400);
+        M5.Display.drawRect(63, 79, 113, 3, 0x0400);
         // datum
         M5.Display.setTextSize(1);
-        M5.Display.setCursor(45, 72);
+        M5.Display.setCursor(45, 85);
         M5.Display.print(dnyTydnu[date.weekDay] + " " + (String) date.date +
                          "." + (String) date.month + "." + (String) date.year);
         drawArrow(2);
     }
     if (prevMinute != time.minutes || clear) {
-        M5.Display.fillRect(33, 8, 174, 55, TFT_BLACK);
+        M5.Display.fillRect(33, 21, 174, 55, TFT_BLACK);
         M5.Display.setTextSize(3);
-        M5.Display.setCursor(33, 8);
+        M5.Display.setCursor(33, 21);
         String hours;
         String minutes;
         if ((time.hours + 2) % 24 < 10) {
@@ -156,14 +205,80 @@ void renderMain() {
         M5.Display.setTextSize(0.5);
         // při velikosti 0.5 je pozice [100;122]
         // při velikosti 1 je pozice [53;110]
-        M5.Display.setCursor(100, 122);
+        M5.Display.setCursor(95, 122);
         M5.Display.print("by danb1551");
     }
     M5.Display.endWrite();
+    if (clear) {
+        delay(400);
+    }
 }
 
+void renderWifi() {
+    if (clear) {
+        M5.Display.fillScreen(TFT_BLACK);
+        drawArrow(1);
+        drawArrow(2);
+        M5.Display.drawBitmap(51, 6, image_wifi_logo, 139, 99, TFT_GREEN);
+        M5.Display.setTextSize(1);
+        M5.Display.setTextColor(TFT_GREEN);
+        M5.Display.setFont(&fonts::FreeSans12pt7b);
+        M5.Display.setCursor(90, 112);
+        M5.Display.print("Wi-Fi");
+        delay(400);
+    }
+}
 
-void renderTools() {}
+void renderWifiMenu(int index) {
+    if (index == 1) {
+        return;
+    }
+}
+
+void renderBluetooth() {
+    if (clear) {
+        M5.Display.fillScreen(TFT_BLACK);
+        drawArrow(1);
+        drawArrow(2);
+        M5.Display.fillRect(102, 30, 28, 52, TFT_WHITE);
+        M5.Display.drawBitmap(92, 24, image_bluetooth_logo, 48, 64, TFT_BLUE);
+        M5.Display.setTextSize(1);
+        M5.Display.setTextColor(TFT_GREEN);
+        M5.Display.setFont(&fonts::FreeSans12pt7b);
+        M5.Display.setCursor(70, 112);
+        M5.Display.print("Bluetooth");
+        delay(400);
+    }
+}
+
+void renderBluetoothMenu(int index) {
+    if (index == 1) {
+        return;
+    }
+}
+
+void renderIR() {
+    if (clear) {
+        M5.Display.fillScreen(TFT_BLACK);
+        drawArrow(1);
+        //drawArrow(2);
+        M5.Display.drawBitmap(94, 25, image_ir_signal, 49, 23, TFT_RED);
+        M5.Display.fillRoundRect(102, 51, 36, 45, 12, 0xBDF7);
+        M5.Display.fillEllipse(113, 68, 5, 5, 0x0);
+        M5.Display.fillEllipse(126, 68, 5, 5, 0x0);
+        M5.Display.fillEllipse(113, 80, 5, 5, 0x0);
+        M5.Display.fillEllipse(126, 80, 5, 5, 0x0);
+        M5.Display.setTextSize(1);
+        M5.Display.setTextColor(TFT_GREEN);
+        M5.Display.setFont(&fonts::FreeSans12pt7b);
+        M5.Display.setCursor(80, 112);
+        M5.Display.print("InfraRed");
+        delay(400);
+    }
+}
+
+void renderIRMenu() {
+}
 
     /// bitmaps (1 = left; 2 = right)
 void drawArrow(int combination) {
@@ -207,23 +322,35 @@ void drawBattery() {
 }
 
 void render() {
+    /*if (choosen > 1) {
+        if (choosen == 2) {
+            renderWifiMenu(1);
+        } else if (choosen == 3) {
+            renderBluetoothMenu(1);
+        }
+    }*/
+    if (showHidden) {
+        M5.Display.powerSave(false);
+        renderHidden();
+    } else {
+        M5.Display.powerSave(true);
+    }
+
     if (renderIndex == 0 || renderIndex == 1) {
         renderMain();
-        renderIndex = 1;
         renderedIndex = 1;
     } else if (renderIndex == 2) {
-        renderTools();
-    } else if (renderIndex == 1) {
-        renderMain();
+        renderWifi();
+        renderedIndex = 2;
+    } else if (renderIndex == 3) {
+        renderBluetooth();
+        renderedIndex = 3;
+    } else if (renderIndex == 4) {
+        renderIR();
+        renderedIndex = 4;
     }
     clear = false;
 }
-
-
-
-
-
-
 
 
 
