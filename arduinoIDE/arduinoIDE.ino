@@ -86,7 +86,6 @@ void loop() {
 
 void sleep() {
     sleeping = true;
-    M5.Imu.sleep();
     M5.Display.setBrightness(0);
     M5.Display.sleep();
     M5.Power.lightSleep(pow(10, 14));
@@ -121,7 +120,6 @@ void select() {
     } else if (renderedIndex == 4) {
     } else if (renderedIndex == 5) {
         sleeping = true;
-        M5.Imu.sleep();
         M5.Display.setBrightness(0);
         M5.Display.sleep();
         M5.Power.deepSleep(pow(10, 14));
