@@ -10,3 +10,4 @@
   - 31 - renderBluetoothMenu(0) - spam iphones
 - 4 - renderIR()
   - 40 - renderIRMenu() - just info about sending Off signals to TVs
+- 5 - 3D cube

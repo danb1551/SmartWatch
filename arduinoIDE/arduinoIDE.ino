@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include "pictures.h"
 #include "config.h"
+#include "cube.h"
 
 bool uspavat = true;
 bool showHidden = false;
@@ -11,7 +12,7 @@ bool clear = true;
 bool showCopyright = true;
 bool sleeping = false;
 // 1 = hodiny; 2 = wifi; 3 = bluetooth; 4 = IR
-int renderIndex = 0;
+int renderIndex = 1;
 int renderedIndex;
 int choosen = 0;
 int prevMinute = 99;
@@ -49,6 +50,7 @@ void setup() {
     btStop();
     setCpuFrequencyMhz(debug ? 20 : 240);
     M5.Display.powerSave(true);
+    M5.Imu.begin();
 }
 
 void loop() {
@@ -84,9 +86,10 @@ void loop() {
 
 void sleep() {
     sleeping = true;
+    M5.Imu.sleep();
     M5.Display.setBrightness(0);
     M5.Display.sleep();
-    M5.Power.lightSleep(pow(10, 6000));
+    M5.Power.lightSleep(pow(10, 14));
 }
 
 void wakeup() {
@@ -113,13 +116,16 @@ void select() {
             return;
         }
         sleep();
-    }/* else if (renderedIndex == 2) {
-        choosen = 2;
-        clear = true;
+    } else if (renderedIndex == 2) {
     } else if (renderedIndex == 3) {
-        choosen = 3;
-        clear = true;
-    }*/
+    } else if (renderedIndex == 4) {
+    } else if (renderedIndex == 5) {
+        sleeping = true;
+        M5.Imu.sleep();
+        M5.Display.setBrightness(0);
+        M5.Display.sleep();
+        M5.Power.deepSleep(pow(10, 14));
+    }
 }
 
 void next() {
@@ -130,8 +136,8 @@ void next() {
     }
     clear = true;
     renderIndex++;
-    if (renderIndex == 5) {
-        renderIndex = 4;
+    if (renderIndex == 6) {
+        renderIndex = 5;
         clear = false;
     }
     /*if (choosen > 1) {
@@ -261,7 +267,7 @@ void renderIR() {
     if (clear) {
         M5.Display.fillScreen(TFT_BLACK);
         drawArrow(1);
-        //drawArrow(2);
+        drawArrow(2);
         M5.Display.drawBitmap(94, 25, image_ir_signal, 49, 23, TFT_RED);
         M5.Display.fillRoundRect(102, 51, 36, 45, 12, 0xBDF7);
         M5.Display.fillEllipse(113, 68, 5, 5, 0x0);
@@ -278,6 +284,11 @@ void renderIR() {
 }
 
 void renderIRMenu() {
+}
+
+void renderImu() {
+    drawCubeIMU();
+    delay(100);
 }
 
     /// bitmaps (1 = left; 2 = right)
@@ -307,16 +318,22 @@ void drawBattery() {
     } else*/
     if (batteryLevel > 75) {
         clearBatteryPlace();
-        M5.Display.drawBitmap(224, 10, image_baterry_full, 10, 14, TFT_GREEN);
+        M5.Display.drawBitmap(224, 8, image_baterry_case, 10, 14, TFT_GREEN);
+        M5.Display.fillRect(226, 12, 6, 2, TFT_GREEN);
+        M5.Display.fillRect(226, 15, 6, 2, TFT_GREEN);
+        M5.Display.fillRect(226, 18, 6, 2, TFT_GREEN);
     } else if (batteryLevel > 50) {
         clearBatteryPlace();
-        M5.Display.drawBitmap(224, 10, image_baterry_middle, 10, 14, 0x67EC);
+        M5.Display.drawBitmap(224, 10, image_baterry_case, 10, 14, 0x67EC);
+        M5.Display.fillRect(226, 15, 6, 2, 0x67EC);
+        M5.Display.fillRect(226, 18, 6, 2, 0x67EC);
     } else if (batteryLevel > 25) {
         clearBatteryPlace();
-        M5.Display.drawBitmap(224, 10, image_baterry_low, 10, 14, TFT_YELLOW);
+        M5.Display.drawBitmap(224, 10, image_baterry_case, 10, 14, TFT_YELLOW);
+        M5.Display.fillRect(226, 18, 6, 2, TFT_YELLOW);
     } else {
         clearBatteryPlace();
-        M5.Display.drawBitmap(224, 10, image_baterry_empty, 10, 14, TFT_RED);
+        M5.Display.drawBitmap(224, 10, image_baterry_case, 10, 14, TFT_RED);
     }
     M5.Display.endWrite();
 }
@@ -332,8 +349,10 @@ void render() {
     if (showHidden) {
         M5.Display.powerSave(false);
         renderHidden();
+        uspavat = false;
     } else {
         M5.Display.powerSave(true);
+        uspavat = true;
     }
 
     if (renderIndex == 0 || renderIndex == 1) {
@@ -348,6 +367,10 @@ void render() {
     } else if (renderIndex == 4) {
         renderIR();
         renderedIndex = 4;
+    } else if (renderIndex == 5) {
+        renderImu();
+        uspavat = false;
+        renderedIndex = 5;
     }
     clear = false;
 }
